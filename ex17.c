@@ -26,6 +26,8 @@ typedef struct Connection_s
     struct Database *db;
 } Connection;
 
+Connection *conn;
+
 void die(const char *message)
 {
     if(errno) {
@@ -44,7 +46,7 @@ void Address_print(struct Address *addr)
         addr->id, addr->name, addr->email);
 }
 
-void Database_load(Connection *conn)
+void Database_load()
 {
     int rc = fread(conn->db, sizeof(struct Database), 1, conn->file);
     if(rc != 1) {
@@ -52,9 +54,9 @@ void Database_load(Connection *conn)
     }
 }
 
-Connection *Database_open(const char *filename, char mode)
+void Database_open(const char *filename, char mode)
 {
-    Connection *conn = malloc(sizeof(Connection));
+    conn = malloc(sizeof(Connection));
 
     if(!conn) {
         die("Memory error");
@@ -80,11 +82,9 @@ Connection *Database_open(const char *filename, char mode)
     if(!conn->file) {
         die("Failed to open the file");
     }
-
-    return conn;
 }
 
-void Database_close(Connection *conn)
+void Database_close()
 {
     if(conn) {
         if(conn->file) {
@@ -97,7 +97,7 @@ void Database_close(Connection *conn)
     }
 }
 
-void Database_write(Connection *conn)
+void Database_write()
 {
     rewind(conn->file);
 
@@ -115,7 +115,7 @@ void Database_write(Connection *conn)
 
 }
 
-void Database_create(Connection *conn)
+void Database_create()
 {
     int i = 0;
 
@@ -125,7 +125,7 @@ void Database_create(Connection *conn)
     }
 }
 
-void Database_set(Connection *conn, int id, char * name, char *email)
+void Database_set(int id, char * name, char *email)
 {
     struct Address *addr = &conn->db->rows[id];
 
@@ -148,7 +148,7 @@ void Database_set(Connection *conn, int id, char * name, char *email)
     }
 }
 
-void Database_get(Connection *conn, int id)
+void Database_get(int id)
 {
     struct Address *addr = &conn->db->rows[id];
 
@@ -160,13 +160,13 @@ void Database_get(Connection *conn, int id)
     }
 }
 
-void Database_delete(Connection *conn, int id)
+void Database_delete(int id)
 {
     struct Address addr = {.id = id , .set = 0};
     conn->db->rows[id] = addr;
 }
 
-void Database_list(Connection *conn)
+void Database_list()
 {
     int i = 0;
     struct Database *db = conn->db;
@@ -176,6 +176,25 @@ void Database_list(Connection *conn)
 
         if(cur->set) {
             Address_print(cur);
+        }
+    }
+}
+
+void Database_find(char * lookup)
+{
+    int i = 0;
+    struct Database *db = conn->db;
+
+    for(i = 0; i < MAX_ROWS; i++) {
+        struct Address *cur = &db->rows[i];
+
+        if(cur->set) {
+            if(strstr(cur->name, lookup) != NULL) {
+                Address_print(cur);
+            }
+            else if(strstr(cur->email, lookup) != NULL) {
+                Address_print(cur);
+            }
         }
     }
 }
@@ -190,8 +209,8 @@ int main(int argc, char const *argv[])
     char *filename = (char *)argv[1];
     char action = argv[2][0];
 
-    Connection *conn = Database_open(filename, action);
-
+    // Connection *conn = Database_open(filename, action);
+    Database_open(filename, action);
     int id = 0;
 
     if(argc > 3) {
@@ -205,8 +224,8 @@ int main(int argc, char const *argv[])
     switch(action) {
 
         case 'c':
-            Database_create(conn);
-            Database_write(conn);
+            Database_create();
+            Database_write();
             break;
 
         case 'g':
@@ -214,7 +233,7 @@ int main(int argc, char const *argv[])
                 die("Need an id to get");
             }
             else {
-                Database_get(conn, id);
+                Database_get(id);
             }
             break;
 
@@ -223,8 +242,8 @@ int main(int argc, char const *argv[])
                 die("Need an id, name, email to set");
             }
             else {
-                Database_set(conn, id, (char *)argv[4], (char *)argv[5]);
-                Database_write(conn);
+                Database_set(id, (char *)argv[4], (char *)argv[5]);
+                Database_write();
             }
             break;
 
@@ -233,19 +252,29 @@ int main(int argc, char const *argv[])
                 die("Need an id to delete");
             }
             else {
-                Database_delete(conn, id);
-                Database_write(conn);
+                Database_delete(id);
+                Database_write();
             }
             break;
 
         case 'l':
-            Database_list(conn);
+            Database_list();
             break;
+
+        case 'f':
+
+            if(argc != 4) {
+                die("Need a string to search");
+            }
+
+            Database_find((char *)argv[3]);
+            break;
+
         default:
-            die("Invalid actions, use:\n c:create, g:get, s:set, d:del, l:list");
+            die("Invalid actions, use:\n c:create, g:get, s:set, d:del, l:list, f:find");
     }
 
-    Database_close(conn);
+    Database_close();
 
     return 0;
 }
